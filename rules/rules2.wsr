@@ -1,0 +1,315 @@
+# Format: rule NAME { meta: ... condition: ... }
+
+# ─────────────────────────────────────────────────────────
+# SUPPLY CHAIN
+# ─────────────────────────────────────────────────────────
+
+rule SUPPLY_CHAIN_HOOK {
+    meta:
+        description = "Build hook / install hook — supply chain compromise pattern"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = supply_chain, npm, pypi
+    condition:
+        strings contains "postinstall"
+        has_start_func
+}
+
+rule SUPPLY_CHAIN_EVAL {
+    meta:
+        description = "Dynamic eval with network fetch — supply chain payload delivery"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = supply_chain, eval, dynamic
+    condition:
+        imports contains "eval"
+        imports contains "fetch"
+}
+
+# ─────────────────────────────────────────────────────────
+# BROWSER ATTACKS
+# ─────────────────────────────────────────────────────────
+
+rule SPECTRE_TIMING {
+    meta:
+        description = "Spectre-style timing attack via SharedArrayBuffer + Atomics"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = spectre, browser, side_channel
+    condition:
+        imports contains "atomics"
+        imports contains "shared_memory"
+}
+
+rule BROWSER_FINGERPRINT_ADVANCED {
+    meta:
+        description = "Advanced browser fingerprinting via multiple device APIs"
+        author = "WASMShark"
+        severity = HIGH
+        tags = browser, fingerprint, tracking
+    condition:
+        imports contains "navigator"
+        imports contains "geolocation"
+        imports contains "battery"
+}
+
+rule CLIPBOARD_CRYPTO_SWAP {
+    meta:
+        description = "Clipboard hijacking for cryptocurrency address substitution"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = browser, clipboard, crypto
+    condition:
+        imports contains "clipboard"
+        ioc contains "bitcoin"
+}
+
+rule WEBRTC_LEAK {
+    meta:
+        description = "WebRTC usage — can expose real IP behind VPN/proxy"
+        author = "WASMShark"
+        severity = MEDIUM
+        tags = browser, webrtc, privacy
+    condition:
+        imports contains "RTCPeerConnection"
+}
+
+# ─────────────────────────────────────────────────────────
+# ADVANCED CRYPTOMINING
+# ─────────────────────────────────────────────────────────
+
+rule STRATUM_MINER {
+    meta:
+        description = "Stratum mining protocol endpoint detected"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = mining, stratum, pool
+    condition:
+        strings contains "stratum"
+}
+
+rule XMRIG_PATTERN {
+    meta:
+        description = "XMRig Monero miner signature"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = mining, monero, xmrig
+    condition:
+        strings contains "xmrig"
+}
+
+rule MINING_POOL_URL {
+    meta:
+        description = "Known mining pool URL in binary"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = mining, pool, c2
+    condition:
+        ioc contains "moneroocean"
+}
+
+rule CRYPTOMINER_HIGH_XOR {
+    meta:
+        description = "High XOR density + crypto imports + start function = active miner"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = mining, obfuscation, autorun
+    condition:
+        xor_ops > 30
+        imports contains "sha256"
+        has_start_func
+}
+
+# ─────────────────────────────────────────────────────────
+# DATA EXFILTRATION
+# ─────────────────────────────────────────────────────────
+
+rule EXFIL_DISCORD_WEBHOOK {
+    meta:
+        description = "Discord webhook used for data exfiltration"
+        author = "WASMShark"
+        severity = HIGH
+        tags = exfil, discord, webhook
+    condition:
+        strings contains "discord.com/api/webhooks"
+}
+
+rule EXFIL_TELEGRAM_BOT {
+    meta:
+        description = "Telegram bot API used for C2 or exfiltration"
+        author = "WASMShark"
+        severity = HIGH
+        tags = exfil, telegram, c2
+    condition:
+        strings contains "api.telegram.org"
+}
+
+rule EXFIL_PASTEBIN {
+    meta:
+        description = "Pastebin used for staging or data drop"
+        author = "WASMShark"
+        severity = HIGH
+        tags = exfil, pastebin, staging
+    condition:
+        strings contains "pastebin.com"
+}
+
+rule GITHUB_RAW_STAGING {
+    meta:
+        description = "GitHub raw content used for payload staging"
+        author = "WASMShark"
+        severity = HIGH
+        tags = staging, github, dropper
+    condition:
+        strings contains "raw.githubusercontent.com"
+}
+
+# ─────────────────────────────────────────────────────────
+# CREDENTIAL THEFT
+# ─────────────────────────────────────────────────────────
+
+rule AWS_KEY_THEFT {
+    meta:
+        description = "AWS access key prefix (AKIA) detected — credential theft"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = credentials, aws, exfil
+    condition:
+        ioc contains "AKIA"
+}
+
+rule GITHUB_TOKEN_THEFT {
+    meta:
+        description = "GitHub personal access token pattern detected"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = credentials, github, token
+    condition:
+        strings contains "ghp_"
+}
+
+rule LINUX_CREDENTIAL_FILES {
+    meta:
+        description = "Linux credential file paths in binary data"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = credentials, linux, exfil
+    condition:
+        ioc contains "/etc/shadow"
+}
+
+# ─────────────────────────────────────────────────────────
+# EVASION
+# ─────────────────────────────────────────────────────────
+
+rule VM_DETECTION {
+    meta:
+        description = "Virtual machine / sandbox detection strings"
+        author = "WASMShark"
+        severity = HIGH
+        tags = evasion, vm_detect, sandbox
+    condition:
+        strings contains "VBOX"
+}
+
+rule VM_DETECTION_VMWARE {
+    meta:
+        description = "VMware detection string"
+        author = "WASMShark"
+        severity = HIGH
+        tags = evasion, vmware, sandbox
+    condition:
+        strings contains "VMWARE"
+}
+
+rule TIMING_EVASION {
+    meta:
+        description = "Sleep/timing imports with obfuscation — anti-sandbox timing evasion"
+        author = "WASMShark"
+        severity = HIGH
+        tags = evasion, timing, anti_sandbox
+    condition:
+        imports contains "sleep"
+        obfusc_score > 40
+}
+
+# ─────────────────────────────────────────────────────────
+# WASI CAPABILITY COMBOS
+# ─────────────────────────────────────────────────────────
+
+rule WASI_FULL_CAPABILITY {
+    meta:
+        description = "WASI module with full filesystem + network + environment access"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = wasi, capability, backdoor
+    condition:
+        is_wasi
+        imports contains "fd_write"
+        imports contains "sock_send"
+        imports contains "environ_get"
+}
+
+rule WASI_RANSOM_TRIAD {
+    meta:
+        description = "WASI ransomware triad: write + rename + random"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = wasi, ransomware, capability
+    condition:
+        is_wasi
+        imports contains "path_rename"
+        imports contains "random_get"
+        imports contains "fd_write"
+}
+
+rule WASI_DROPPER_NETWORK {
+    meta:
+        description = "WASI dropper with network fetch capability"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = wasi, dropper, network
+    condition:
+        is_wasi
+        imports contains "fd_write"
+        imports contains "sock_recv"
+}
+
+# ─────────────────────────────────────────────────────────
+# OBFUSCATION ADVANCED
+# ─────────────────────────────────────────────────────────
+
+rule HEAVILY_OBFUSCATED_LARGE {
+    meta:
+        description = "Large, heavily obfuscated module — likely packed"
+        author = "WASMShark"
+        severity = HIGH
+        tags = obfuscation, packing, large
+    condition:
+        obfusc_score > 70
+        function_count > 50
+        entropy > 6.5
+}
+
+rule HIGH_CONFIDENCE_MALICIOUS {
+    meta:
+        description = "Multiple independent malicious signals agree — high confidence"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = multi_signal, high_confidence
+    condition:
+        malice_score > 80
+        has_taint
+        has_indirect_calls
+}
+
+rule DEAD_CODE_OBFUSCATION {
+    meta:
+        description = "High dead code count with obfuscation — padding/evasion"
+        author = "WASMShark"
+        severity = MEDIUM
+        tags = obfuscation, dead_code, evasion
+    condition:
+        obfusc_score > 50
+        has_indirect_calls
+}

@@ -1,0 +1,339 @@
+# Format:
+#   rule RULE_NAME {
+#       meta:
+#           description = "..."
+#           author = "..."
+#           severity = CRITICAL|HIGH|MEDIUM|LOW
+#           tags = tag1, tag2
+#       condition:
+#           <condition statements>
+#   }
+
+
+# ─────────────────────────────────────────────────────────
+# CRYPTOMINING
+# ─────────────────────────────────────────────────────────
+
+rule COINHIVE_WASM {
+    meta:
+        description = "CoinHive / Coinhive-fork cryptominer pattern"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = mining, cryptojacking, coinhive
+    condition:
+        imports contains "cryptonight"
+        strings contains "coinhive"
+}
+
+rule GENERIC_MINER_HASH_NONCE {
+    meta:
+        description = "Generic miner: hash function + nonce + difficulty pattern"
+        author = "WASMShark"
+        severity = HIGH
+        tags = mining, cryptomining
+    condition:
+        imports contains "hash"
+        strings contains "nonce"
+        strings contains "difficulty"
+}
+
+rule RANDOMX_MONERO_MINER {
+    meta:
+        description = "RandomX/Monero mining module"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = mining, monero, randomx
+    condition:
+        imports contains "randomx"
+        ioc contains "monero"
+}
+
+rule SHA3_MINING {
+    meta:
+        description = "SHA-3/Keccak based miner (Ethereum-style)"
+        author = "WASMShark"
+        severity = HIGH
+        tags = mining, ethereum, sha3
+    condition:
+        imports contains "keccak"
+        xor_ops > 15
+}
+
+# ─────────────────────────────────────────────────────────
+# RANSOMWARE
+# ─────────────────────────────────────────────────────────
+
+rule RANSOMWARE_DROPPER {
+    meta:
+        description = "Ransomware dropper: encryption + ransom note"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = ransomware, encryption, dropper
+    condition:
+        strings contains "ransom"
+        strings contains "bitcoin"
+}
+
+rule RANSOMWARE_ENCRYPT_WASI {
+    meta:
+        description = "WASI-based file encryptor (ransomware pattern)"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = ransomware, wasi, fileencrypt
+    condition:
+        is_wasi
+        imports contains "path_open"
+        strings contains "encrypt"
+}
+
+rule CHACHA20_RANSOMWARE {
+    meta:
+        description = "ChaCha20 encryption (common modern ransomware cipher)"
+        author = "WASMShark"
+        severity = HIGH
+        tags = ransomware, chacha20
+    condition:
+        crypto_constant "ChaCha20 'expa'"
+        has_start_func
+}
+
+# ─────────────────────────────────────────────────────────
+# C2 / BACKDOOR
+# ─────────────────────────────────────────────────────────
+
+rule TOR_C2_BEACON {
+    meta:
+        description = "Tor-based C2 beacon (.onion address)"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = c2, tor, beacon, network
+    condition:
+        ioc contains ".onion"
+}
+
+rule HTTP_BEACON {
+    meta:
+        description = "HTTP-based C2 beacon with network socket"
+        author = "WASMShark"
+        severity = HIGH
+        tags = c2, http, network
+    condition:
+        imports contains "socket"
+        ioc contains "http"
+}
+
+rule WEBSOCKET_C2 {
+    meta:
+        description = "WebSocket-based C2 channel"
+        author = "WASMShark"
+        severity = HIGH
+        tags = c2, websocket, browser
+    condition:
+        imports contains "websocket"
+}
+
+rule COBALT_STRIKE_WASM {
+    meta:
+        description = "CobaltStrike beacon WASM wrapper"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = c2, cobaltstrike, beacon
+    condition:
+        ioc contains "beacon"
+        ioc contains "cobalt"
+}
+
+# ─────────────────────────────────────────────────────────
+# DROPPERS / LOADERS
+# ─────────────────────────────────────────────────────────
+
+rule POWERSHELL_DROPPER {
+    meta:
+        description = "WASM dropping PowerShell payload"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = dropper, powershell, windows
+    condition:
+        strings contains "powershell"
+        is_wasi
+}
+
+rule BASH_DROPPER {
+    meta:
+        description = "WASM dropping shell script via WASI"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = dropper, bash, linux
+    condition:
+        ioc contains "/bin/sh"
+        is_wasi
+        imports contains "fd_write"
+}
+
+rule FILELESS_EXEC {
+    meta:
+        description = "Possible fileless execution via memfd_create pattern"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = fileless, execution, memfd
+    condition:
+        strings contains "memfd"
+        has_start_func
+}
+
+rule WGET_CURL_STAGE2 {
+    meta:
+        description = "Stage2 downloader via wget/curl"
+        author = "WASMShark"
+        severity = HIGH
+        tags = dropper, downloader, stage2
+    condition:
+        ioc contains "wget"
+        ioc contains "http"
+}
+
+# ─────────────────────────────────────────────────────────
+# CREDENTIAL THEFT
+# ─────────────────────────────────────────────────────────
+
+rule AWS_CREDENTIAL_THEFT {
+    meta:
+        description = "AWS credential extraction attempt"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = credentials, aws, exfil
+    condition:
+        ioc contains "AWS_"
+}
+
+rule SSH_KEY_THEFT {
+    meta:
+        description = "SSH private key access"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = credentials, ssh, exfil
+    condition:
+        ioc contains "id_rsa"
+}
+
+rule LINUX_SHADOW_READ {
+    meta:
+        description = "Attempts to read /etc/shadow (privilege escalation)"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = credentials, linux, shadow
+    condition:
+        ioc contains "/etc/shadow"
+}
+
+# ─────────────────────────────────────────────────────────
+# OBFUSCATION / PACKING
+# ─────────────────────────────────────────────────────────
+
+rule HEAVILY_PACKED {
+    meta:
+        description = "Heavily packed or encrypted WASM module"
+        author = "WASMShark"
+        severity = HIGH
+        tags = obfuscation, packing, evasion
+    condition:
+        entropy > 7.4
+        import_count < 5
+        has_start_func
+}
+
+rule XOR_STRING_DECRYPT {
+    meta:
+        description = "XOR-based string decryption pattern"
+        author = "WASMShark"
+        severity = MEDIUM
+        tags = obfuscation, xor, strings
+    condition:
+        xor_ops > 100
+        function_count > 2
+}
+
+rule MULTI_LAYER_OBFUSC {
+    meta:
+        description = "Multiple obfuscation layers detected"
+        author = "WASMShark"
+        severity = HIGH
+        tags = obfuscation, multilayer
+    condition:
+        has_indirect_calls
+        obfusc_score > 60
+        entropy > 6.8
+}
+
+rule ANTI_ANALYSIS {
+    meta:
+        description = "Anti-analysis / timing evasion pattern"
+        author = "WASMShark"
+        severity = HIGH
+        tags = evasion, anti-analysis, timing
+    condition:
+        imports contains "sleep"
+        imports contains "timing"
+}
+
+# ─────────────────────────────────────────────────────────
+# BROWSER ATTACKS
+# ─────────────────────────────────────────────────────────
+
+rule BROWSER_STORAGE_THEFT {
+    meta:
+        description = "Browser localStorage/cookie theft"
+        author = "WASMShark"
+        severity = HIGH
+        tags = browser, exfil, storage
+    condition:
+        imports contains "localStorage"
+}
+
+rule CLIPBOARD_HIJACK {
+    meta:
+        description = "Clipboard content theft (crypto address swap)"
+        author = "WASMShark"
+        severity = HIGH
+        tags = browser, clipboard, cryptojacking
+    condition:
+        imports contains "clipboard"
+        ioc contains "bitcoin"
+}
+
+rule BROWSER_FINGERPRINT {
+    meta:
+        description = "Browser fingerprinting for tracking/exfil"
+        author = "WASMShark"
+        severity = MEDIUM
+        tags = browser, fingerprint, privacy
+    condition:
+        imports contains "navigator"
+        imports contains "geolocation"
+}
+
+# ─────────────────────────────────────────────────────────
+# DATA EXFILTRATION
+# ─────────────────────────────────────────────────────────
+
+rule DATA_EXFIL_NETWORK {
+    meta:
+        description = "Data exfiltration via network"
+        author = "WASMShark"
+        severity = HIGH
+        tags = exfil, network, data
+    condition:
+        ioc contains "exfil"
+        imports contains "send"
+}
+
+rule TAINT_NETWORK_EXFIL {
+    meta:
+        description = "Taint analysis: network data → exfil pattern"
+        author = "WASMShark"
+        severity = HIGH
+        tags = taint, exfil, network
+    condition:
+        has_taint
+        imports contains "network"
+}

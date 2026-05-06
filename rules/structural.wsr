@@ -1,0 +1,584 @@
+# Detection based on code structure, metrics, and behavioral patterns
+
+
+# ─────────────────────────────────────────────────────────
+# CRYPTO CONSTANT COMBINATIONS
+# (requires specific algorithm constants to co-occur)
+# ─────────────────────────────────────────────────────────
+
+rule SHA256_FULL_IV_SET {
+    meta:
+        description = "All 8 SHA-256 initialization vectors present — complete SHA-256 implementation"
+        author = "WASMShark"
+        severity = HIGH
+        tags = crypto, sha256, implementation
+    condition:
+        crypto_constant "SHA-256 H0"
+        crypto_constant "SHA-256 H1"
+        crypto_constant "SHA-256 H2"
+        crypto_constant "SHA-256 H3"
+}
+
+rule SHA256_ROUND_CONSTANTS {
+    meta:
+        description = "SHA-256 round constants present alongside IV — mining round function"
+        author = "WASMShark"
+        severity = HIGH
+        tags = crypto, sha256, mining
+    condition:
+        crypto_constant "SHA-256 H0"
+        crypto_constant "SHA-256 K[0]"
+        crypto_constant "SHA-256 K[1]"
+}
+
+rule CHACHA20_FULL_SIGMA {
+    meta:
+        description = "All four ChaCha20 sigma constants — complete ChaCha20 implementation"
+        author = "WASMShark"
+        severity = HIGH
+        tags = crypto, chacha20, implementation
+    condition:
+        crypto_constant "ChaCha20 'expa'"
+        crypto_constant "ChaCha20 'nd 3'"
+}
+
+rule CRC32_WITH_NETWORK {
+    meta:
+        description = "CRC32 polynomial + network imports — integrity check over C2 channel"
+        author = "WASMShark"
+        severity = MEDIUM
+        tags = crypto, crc32, network
+    condition:
+        crypto_constant "CRC32 polynomial"
+        imports contains "connect"
+}
+
+rule DEADBEEF_XOR_HEAVY {
+    meta:
+        description = "DEADBEEF constant + high XOR density — XOR obfuscation key"
+        author = "WASMShark"
+        severity = HIGH
+        tags = obfuscation, xor, magic_constant
+    condition:
+        crypto_constant "Magic: DEADBEEF"
+        xor_ops > 20
+}
+
+rule MULTIPLE_MAGIC_CONSTANTS {
+    meta:
+        description = "Multiple suspicious magic constants — obfuscated key material"
+        author = "WASMShark"
+        severity = HIGH
+        tags = obfuscation, magic_constants
+    condition:
+        crypto_constant "Magic: DEADBEEF"
+        crypto_constant "Magic: CAFEBABE"
+}
+
+rule XTEA_DELTA_HIGH_XOR {
+    meta:
+        description = "XTEA delta constant + high XOR = XTEA block cipher implementation"
+        author = "WASMShark"
+        severity = HIGH
+        tags = crypto, xtea, cipher
+    condition:
+        crypto_constant "XTEA delta"
+        xor_ops > 15
+}
+
+# ─────────────────────────────────────────────────────────
+# ENTROPY + STRUCTURAL COMBINATIONS
+# (high entropy sections correlated with code structure)
+# ─────────────────────────────────────────────────────────
+
+rule HIGH_ENTROPY_AUTORUN_FEW_IMPORTS {
+    meta:
+        description = "High entropy + auto-execute + minimal imports = packer stub"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = packing, entropy, autorun
+    condition:
+        entropy > 7.0
+        has_start_func
+        import_count < 4
+}
+
+rule HIGH_ENTROPY_TAINT_FLOW {
+    meta:
+        description = "High entropy data + taint flow = encrypted payload being processed"
+        author = "WASMShark"
+        severity = HIGH
+        tags = packing, entropy, taint
+    condition:
+        entropy > 6.8
+        has_taint
+        xor_ops > 15
+}
+
+rule HIGH_ENTROPY_INDIRECT_DISPATCH {
+    meta:
+        description = "High entropy + indirect calls = obfuscated dispatcher with encrypted payload"
+        author = "WASMShark"
+        severity = HIGH
+        tags = obfuscation, entropy, dispatcher
+    condition:
+        entropy > 6.5
+        has_indirect_calls
+        obfusc_score > 50
+}
+
+rule LOW_ENTROPY_MANY_FUNCTIONS {
+    meta:
+        description = "Low entropy but many functions — possibly stripped or synthetic code"
+        author = "WASMShark"
+        severity = LOW
+        tags = structure, anomaly
+    condition:
+        function_count > 50
+        import_count < 3
+}
+
+rule EXTREME_ENTROPY_ANY_IMPORTS {
+    meta:
+        description = "Extremely high entropy with any imports — encrypted payload loader"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = packing, entropy, loader
+    condition:
+        entropy > 7.5
+        import_count > 1
+}
+
+# ─────────────────────────────────────────────────────────
+# IMPORT COMBINATION PATTERNS
+# (specific dangerous combinations of import types)
+# ─────────────────────────────────────────────────────────
+
+rule RANDOM_THEN_CRYPTO_THEN_WRITE {
+    meta:
+        description = "random_get + crypto + write = key generation followed by encryption"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = ransomware, crypto, wasi
+    condition:
+        imports contains "random_get"
+        imports contains "sha256"
+        imports contains "fd_write"
+}
+
+rule NETWORK_RECV_THEN_EXEC {
+    meta:
+        description = "Network receive + execution imports = remote code execution capability"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = rce, network, execution
+    condition:
+        imports contains "recv"
+        imports contains "exec"
+}
+
+rule ENV_READ_THEN_NETWORK {
+    meta:
+        description = "Environment read + network send = credential exfiltration pattern"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = exfil, credentials, environment
+    condition:
+        imports contains "environ_get"
+        imports contains "sock_send"
+}
+
+rule FILE_READ_THEN_NETWORK_SEND {
+    meta:
+        description = "File read + network send = file exfiltration capability"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = exfil, file, network
+    condition:
+        imports contains "fd_read"
+        imports contains "sock_send"
+}
+
+rule CRYPTO_HASH_PLUS_RANDOM_PLUS_RENAME {
+    meta:
+        description = "Hash + random + rename = encrypt-and-rename ransomware pattern"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = ransomware, crypto, rename
+    condition:
+        imports contains "sha256"
+        imports contains "random_get"
+        imports contains "path_rename"
+}
+
+rule NETWORK_ACCEPT_PLUS_FILE {
+    meta:
+        description = "Accept connections + file access = inbound backdoor"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = backdoor, network, file
+    condition:
+        imports contains "sock_accept"
+        imports contains "path_open"
+}
+
+rule MEMORY_GROW_PLUS_EXEC {
+    meta:
+        description = "Memory allocation + execution = in-memory execution staging"
+        author = "WASMShark"
+        severity = HIGH
+        tags = execution, memory, staging
+    condition:
+        imports contains "mmap"
+        imports contains "exec"
+}
+
+rule CLOCK_PLUS_NETWORK_PLUS_CRYPTO {
+    meta:
+        description = "Timing + network + crypto = cryptominer with pool reporting"
+        author = "WASMShark"
+        severity = HIGH
+        tags = mining, timing, network
+    condition:
+        imports contains "clock_time_get"
+        imports contains "sock_send"
+        imports contains "sha256"
+}
+
+# ─────────────────────────────────────────────────────────
+# TAINT FLOW PATTERNS
+# (data flow from sources to dangerous sinks)
+# ─────────────────────────────────────────────────────────
+
+rule TAINT_FROM_NETWORK_HIGH_MALICE {
+    meta:
+        description = "Tainted data from network imports + high malice = active C2 data processing"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = taint, network, c2
+    condition:
+        has_taint
+        imports contains "recv"
+        malice_score > 50
+}
+
+rule TAINT_FROM_FILE_HIGH_XOR {
+    meta:
+        description = "Tainted file data + high XOR = file content encryption"
+        author = "WASMShark"
+        severity = HIGH
+        tags = taint, file, encryption
+    condition:
+        has_taint
+        imports contains "fd_read"
+        xor_ops > 25
+}
+
+rule TAINT_WITH_INDIRECT_CALLS {
+    meta:
+        description = "Taint flow through indirect calls = obfuscated data processing chain"
+        author = "WASMShark"
+        severity = HIGH
+        tags = taint, obfuscation, indirect
+    condition:
+        has_taint
+        has_indirect_calls
+        obfusc_score > 30
+}
+
+rule TAINT_PLUS_CRYPTO_CONSTANT {
+    meta:
+        description = "Taint flow + crypto constant = tainted data fed into crypto algorithm"
+        author = "WASMShark"
+        severity = HIGH
+        tags = taint, crypto, keyderivation
+    condition:
+        has_taint
+        crypto_constant "SHA-256 H0"
+}
+
+rule TAINT_PLUS_NETWORK_WRITE {
+    meta:
+        description = "Taint flow + network write = externally-influenced data sent out"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = taint, exfil, network
+    condition:
+        has_taint
+        imports contains "sock_send"
+}
+
+# ─────────────────────────────────────────────────────────
+# FUNCTION METRIC PATTERNS
+# (uses function count, XOR density, indirect call density)
+# ─────────────────────────────────────────────────────────
+
+rule MANY_FUNCTIONS_HIGH_XOR_INDIRECT {
+    meta:
+        description = "Many functions + high XOR + indirect calls = obfuscated large module"
+        author = "WASMShark"
+        severity = HIGH
+        tags = obfuscation, complexity, indirect
+    condition:
+        function_count > 20
+        xor_ops > 50
+        has_indirect_calls
+}
+
+rule FEW_FUNCTIONS_HIGH_MALICE {
+    meta:
+        description = "Very few functions but high malice = compact targeted malware"
+        author = "WASMShark"
+        severity = HIGH
+        tags = malware, compact
+    condition:
+        function_count < 4
+        malice_score > 60
+}
+
+rule SINGLE_FUNCTION_HIGH_XOR {
+    meta:
+        description = "Single function with extreme XOR density = monolithic decryptor"
+        author = "WASMShark"
+        severity = HIGH
+        tags = obfuscation, monolithic, xor
+    condition:
+        function_count < 3
+        xor_ops > 40
+        has_start_func
+}
+
+rule HIGH_FUNCTION_COUNT_LOW_IMPORTS {
+    meta:
+        description = "Many functions but few imports = self-contained packed module"
+        author = "WASMShark"
+        severity = MEDIUM
+        tags = packing, structure
+    condition:
+        function_count > 100
+        import_count < 5
+        entropy > 6.0
+}
+
+rule INDIRECT_CALL_DOMINANT {
+    meta:
+        description = "Module where indirect calls dominate — heavy dispatcher obfuscation"
+        author = "WASMShark"
+        severity = HIGH
+        tags = obfuscation, dispatcher, indirect
+    condition:
+        has_indirect_calls
+        obfusc_score > 70
+        function_count > 5
+}
+
+# ─────────────────────────────────────────────────────────
+# SCORE THRESHOLD COMBINATIONS
+# (multi-score compound conditions)
+# ─────────────────────────────────────────────────────────
+
+rule BALANCED_MALICE_OBFUSC {
+    meta:
+        description = "Both malice and obfuscation elevated — evasive active threat"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = composite, evasive, malicious
+    condition:
+        malice_score > 55
+        obfusc_score > 55
+}
+
+rule HIGH_MALICE_LOW_OBFUSC {
+    meta:
+        description = "High malice, low obfuscation = brazen unobfuscated malware"
+        author = "WASMShark"
+        severity = HIGH
+        tags = composite, malware, unobfuscated
+    condition:
+        malice_score > 70
+        obfusc_score < 20
+}
+
+rule MODERATE_BOTH_WASI {
+    meta:
+        description = "Moderate malice + moderate obfuscation + WASI = evasive WASI threat"
+        author = "WASMShark"
+        severity = HIGH
+        tags = composite, wasi, evasive
+    condition:
+        malice_score > 35
+        obfusc_score > 35
+        is_wasi
+}
+
+rule HIGH_CONFIDENCE_TAINT_SCORE {
+    meta:
+        description = "Taint flow confirmed + high malice = active threat with data flow evidence"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = composite, taint, confirmed
+    condition:
+        has_taint
+        malice_score > 65
+}
+
+rule CRYPTO_SCORE_NETWORK_SCORE {
+    meta:
+        description = "Crypto constants + network imports + elevated malice = active crypto threat"
+        author = "WASMShark"
+        severity = HIGH
+        tags = composite, crypto, network
+    condition:
+        crypto_constant "SHA-256 H0"
+        imports contains "connect"
+        malice_score > 40
+}
+
+# ─────────────────────────────────────────────────────────
+# WASI STRUCTURAL PATTERNS
+# (based on which capabilities are combined, not what strings say)
+# ─────────────────────────────────────────────────────────
+
+rule WASI_WRITE_RANDOM_NO_READ {
+    meta:
+        description = "WASI write + randomness but no read = write-only encryptor"
+        author = "WASMShark"
+        severity = HIGH
+        tags = wasi, ransomware, structural
+    condition:
+        is_wasi
+        imports contains "fd_write"
+        imports contains "random_get"
+        import_count > 3
+}
+
+rule WASI_FULL_NET_STACK {
+    meta:
+        description = "WASI full network stack — bind+listen+accept+send+recv"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = wasi, backdoor, network
+    condition:
+        is_wasi
+        imports contains "sock_bind"
+        imports contains "sock_accept"
+        imports contains "sock_send"
+}
+
+rule WASI_PATH_ENUM_NETWORK {
+    meta:
+        description = "WASI path traversal + network = remote filesystem access"
+        author = "WASMShark"
+        severity = HIGH
+        tags = wasi, filesystem, network
+    condition:
+        is_wasi
+        imports contains "path_open"
+        imports contains "sock_send"
+        import_count > 4
+}
+
+rule WASI_MINIMAL_SUSPICIOUS {
+    meta:
+        description = "Minimal WASI imports but high malice — targeted capability"
+        author = "WASMShark"
+        severity = HIGH
+        tags = wasi, targeted, minimal
+    condition:
+        is_wasi
+        import_count < 5
+        malice_score > 50
+}
+
+# ─────────────────────────────────────────────────────────
+# SECTION STRUCTURE PATTERNS
+# (anomalous binary layout)
+# ─────────────────────────────────────────────────────────
+
+rule CUSTOM_SECTION_HIGH_ENTROPY_MALICE {
+    meta:
+        description = "Non-standard custom section + high entropy + malice = hidden payload"
+        author = "WASMShark"
+        severity = HIGH
+        tags = custom_section, entropy, payload
+    condition:
+        has_custom_sections
+        entropy > 6.5
+        malice_score > 40
+}
+
+rule LARGE_DATA_SMALL_CODE {
+    meta:
+        description = "Large data segments relative to function count = data-heavy module"
+        author = "WASMShark"
+        severity = MEDIUM
+        tags = structure, data, anomaly
+    condition:
+        function_count < 5
+        entropy > 6.0
+        has_start_func
+}
+
+rule NO_EXPORTS_HAS_START {
+    meta:
+        description = "No useful exports but has start function = hidden auto-executor"
+        author = "WASMShark"
+        severity = HIGH
+        tags = structure, autorun, hidden
+    condition:
+        has_start_func
+        malice_score > 30
+        import_count > 2
+}
+
+# ─────────────────────────────────────────────────────────
+# COMPLEXITY + BEHAVIOR COMBINATIONS
+# ─────────────────────────────────────────────────────────
+
+rule COMPLEX_MODULE_NETWORK {
+    meta:
+        description = "High complexity module with network access = complex C2 agent"
+        author = "WASMShark"
+        severity = HIGH
+        tags = complexity, network, c2
+    condition:
+        function_count > 30
+        has_indirect_calls
+        imports contains "connect"
+}
+
+rule COMPLEX_MODULE_CRYPTO {
+    meta:
+        description = "High complexity + crypto constants = complex cryptographic implementation"
+        author = "WASMShark"
+        severity = HIGH
+        tags = complexity, crypto
+    condition:
+        function_count > 20
+        crypto_constant "SHA-256 H0"
+        xor_ops > 30
+}
+
+rule SIMPLE_MODULE_HIGH_MALICE {
+    meta:
+        description = "Simple module structure but high malice = targeted single-purpose malware"
+        author = "WASMShark"
+        severity = HIGH
+        tags = targeted, simple, malware
+    condition:
+        function_count < 5
+        import_count < 6
+        malice_score > 70
+}
+
+rule IOC_PLUS_TAINT_PLUS_NETWORK {
+    meta:
+        description = "IoC strings + taint flow + network = complete active threat"
+        author = "WASMShark"
+        severity = CRITICAL
+        tags = composite, ioc, taint, network
+    condition:
+        has_taint
+        imports contains "connect"
+        malice_score > 45
+}
