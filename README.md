@@ -34,6 +34,12 @@ to detect malicious WASM binaries.
 
 ---
 
+## Sample Output
+
+![Sample Output](Example_Output.png)
+
+---
+
 ## Dependencies
 
 ```bash
